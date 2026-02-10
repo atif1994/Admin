@@ -26,6 +26,21 @@ class RecordsController extends GetxController {
     );
   }
 
+  void updateRecord(VaccinationRecord updatedRecord) {
+    final index = records.indexWhere((r) => r.id == updatedRecord.id);
+    if (index != -1) {
+      records[index] = updatedRecord;
+      Get.snackbar(
+        'Updated',
+        'Record updated successfully',
+        backgroundColor: AppTheme.success,
+        colorText: AppTheme.onPrimary,
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      );
+    }
+  }
+
   void removeRecord(String id) {
     records.removeWhere((r) => r.id == id);
   }

@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../controllers/records_controller.dart';
 import '../controllers/auth_controller.dart';
 import '../routes/app_routes.dart';
+import 'create_record_screen.dart';
 
 /// MVC View: list of records (date / child / visit).
 /// Uses [RecordsController] for data and [AuthController] for logout.
@@ -20,31 +21,63 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static final DateFormat _dateFormat = DateFormat('MMM d, y');
-  String? _selectedRecordId;
 
   RecordsController get _records => Get.find<RecordsController>();
   AuthController get _auth => Get.find<AuthController>();
 
-  void _selectRecord(String? id) {
-    setState(() {
-      _selectedRecordId = id;
-    });
-  }
-
-  void _editRecord() {
-    if (_selectedRecordId == null) return;
-    // TODO: Navigate to edit screen with record data
-    Get.snackbar(
-      'Edit',
-      'Edit functionality coming soon',
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.all(16),
+  void _showOptionsBottomSheet(VaccinationRecord record) {
+    Get.bottomSheet(
+      Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: AppTheme.onSurfaceVariant.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.edit_outlined, color: AppTheme.primary),
+              title: const Text('Edit'),
+              onTap: () {
+                Get.back();
+                _editRecord(record);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: AppTheme.error),
+              title: Text('Delete', style: TextStyle(color: AppTheme.error)),
+              onTap: () {
+                Get.back();
+                _deleteRecord(record);
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+      isScrollControlled: true,
     );
-    _selectRecord(null);
   }
 
-  void _deleteRecord() {
-    if (_selectedRecordId == null) return;
+  void _editRecord(VaccinationRecord record) {
+    Get.to(
+      () => CreateRecordScreen(existingRecord: record),
+      transition: Transition.rightToLeft,
+    );
+  }
+
+  void _deleteRecord(VaccinationRecord record) {
     Get.dialog(
       AlertDialog(
         title: const Text('Delete record'),
@@ -56,9 +89,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           FilledButton(
             onPressed: () {
-              _records.removeRecord(_selectedRecordId!);
+              _records.removeRecord(record.id);
               Get.back();
-              _selectRecord(null);
             },
             style: FilledButton.styleFrom(
               backgroundColor: AppTheme.error,
@@ -77,60 +109,17 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Vaccination Records'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => Get.toNamed(Routes.createRecord),
-            tooltip: 'Create record',
-          ),
-          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _auth.logout,
           ),
         ],
       ),
-      floatingActionButton: _selectedRecordId == null
-          ? FloatingActionButton(
-              onPressed: () => Get.toNamed(Routes.createRecord),
-              tooltip: 'Create record',
-              backgroundColor: AppTheme.primaryLight,
-              child: const Icon(Icons.add),
-            )
-          : null,
-      bottomNavigationBar: _selectedRecordId != null
-          ? BottomAppBar(
-              color: AppTheme.surfaceCard,
-              elevation: 8,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _editRecord,
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('Edit'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _deleteRecord,
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('Delete'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppTheme.error,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Get.toNamed(Routes.createRecord),
+        tooltip: 'Create record',
+        backgroundColor: AppTheme.primaryLight,
+        child: const Icon(Icons.add),
+      ),
       body: Obx(() {
         final list = _records.records;
         if (list.isEmpty) {
@@ -144,12 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return _RecordCard(
               record: record,
               dateFormat: _dateFormat,
-              isSelected: _selectedRecordId == record.id,
-              onTap: () {
-                _selectRecord(
-                  _selectedRecordId == record.id ? null : record.id,
-                );
-              },
+              onMenuTap: () => _showOptionsBottomSheet(record),
             );
           },
         );
@@ -184,14 +168,12 @@ class _RecordCard extends StatelessWidget {
   const _RecordCard({
     required this.record,
     required this.dateFormat,
-    required this.isSelected,
-    required this.onTap,
+    required this.onMenuTap,
   });
 
   final VaccinationRecord record;
   final DateFormat dateFormat;
-  final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback onMenuTap;
 
   @override
   Widget build(BuildContext context) {
@@ -209,39 +191,77 @@ class _RecordCard extends StatelessWidget {
       (sum, vaccine) => sum + vaccine.doses.length,
     );
     
+    // If only one vaccine, show doses directly without vaccine tile wrapper
+    final hasOnlyOneVaccine = record.vaccines.length == 1;
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      color: isSelected
-          ? AppTheme.primary.withValues(alpha: 0.08)
-          : AppTheme.surfaceCard,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+      color: AppTheme.surfaceCard,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: false,
           leading: CircleAvatar(
-            backgroundColor: isSelected
-                ? AppTheme.primary
-                : AppTheme.primary.withValues(alpha: 0.12),
+            backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
             child: Icon(
               Icons.vaccines_outlined,
-              color: isSelected ? AppTheme.onPrimary : AppTheme.primary,
+              color: AppTheme.primary,
             ),
           ),
-          title: Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? AppTheme.primaryDark : null,
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
+              ),
+              IconButton(
+                icon: Icon(Icons.more_vert, color: AppTheme.onSurfaceVariant),
+                onPressed: onMenuTap,
+                tooltip: 'Options',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
           ),
           subtitle: Text(
             '${dateFormat.format(record.date)} · $totalDoses dose${totalDoses == 1 ? '' : 's'}',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
-          children: record.vaccines
-              .map((vaccine) => _VaccineTile(vaccine: vaccine))
-              .toList(),
+          children: hasOnlyOneVaccine
+              ? [
+                  // Show brand if available
+                  if (record.vaccines.first.brand != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.vaccines_outlined,
+                            color: AppTheme.primaryLight,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            record.vaccines.first.brand!,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: AppTheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // Show doses directly
+                  ...record.vaccines.first.doses
+                      .map((dose) => _DoseTile(dose: dose))
+                      .toList(),
+                ]
+              : record.vaccines
+                  .map((vaccine) => _VaccineTile(vaccine: vaccine))
+                  .toList(),
         ),
       ),
     );
