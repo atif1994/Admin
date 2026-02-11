@@ -50,7 +50,11 @@ class _CreateRecordScreenState extends State<CreateRecordScreen> {
         }
         
         entry.isMaximumAgeInfinite = vaccine.isMaximumAgeInfinite;
-        entry.selectedMaximumGapYears = vaccine.maximumGapYears;
+        if (vaccine.maximumGapYears != null) {
+          entry.selectedMaximumGap = vaccine.maximumGapYears == 1 
+              ? '1 Year' 
+              : '${vaccine.maximumGapYears} Years';
+        }
         
         // Populate doses (with per-dose min age and gap)
         for (final dose in vaccine.doses) {
@@ -62,7 +66,12 @@ class _CreateRecordScreenState extends State<CreateRecordScreen> {
               dose.minimumAgeUnit,
             );
           }
-          doseEntry.selectedMaximumGapYears = dose.maximumGapYears;
+          if (dose.maximumGapValue != null) {
+            doseEntry.selectedMaximumGap = _formatAgeDisplay(
+              dose.maximumGapValue!,
+              dose.maximumGapUnit,
+            );
+          }
           entry.doseEntries.add(doseEntry);
         }
         
@@ -195,12 +204,14 @@ class _CreateRecordScreenState extends State<CreateRecordScreen> {
         final doseName = de.nameController.text.trim();
         if (doseName.isEmpty) continue;
         final doseMinAge = _parseAgeSelection(de.selectedMinimumAge);
+        final doseMaxGap = _parseAgeSelection(de.selectedMaximumGap);
         doses.add(Dose(
           id: _newId(),
           name: doseName,
           minimumAgeValue: doseMinAge?['value'],
           minimumAgeUnit: doseMinAge?['unit'] ?? AgeUnit.month,
-          maximumGapYears: de.selectedMaximumGapYears,
+          maximumGapValue: doseMaxGap?['value'],
+          maximumGapUnit: doseMaxGap?['unit'] ?? AgeUnit.month,
         ));
       }
       if (doses.isEmpty) {
@@ -217,6 +228,21 @@ class _CreateRecordScreenState extends State<CreateRecordScreen> {
       final maxAgeData = v.isMaximumAgeInfinite 
           ? null 
           : _parseAgeSelection(v.selectedMaximumAge);
+      final maxGapData = _parseAgeSelection(v.selectedMaximumGap);
+      
+      // Convert gap to years for backward compatibility (if needed)
+      int? gapInYears;
+      if (maxGapData != null) {
+        final unit = maxGapData['unit'] as AgeUnit;
+        final value = maxGapData['value'] as int;
+        if (unit == AgeUnit.year) {
+          gapInYears = value;
+        } else if (unit == AgeUnit.month) {
+          gapInYears = (value / 12).ceil();
+        } else {
+          gapInYears = 1; // weeks default to 1 year
+        }
+      }
       
       vaccines.add(Vaccine(
         id: _newId(),
@@ -230,7 +256,7 @@ class _CreateRecordScreenState extends State<CreateRecordScreen> {
         maximumAgeValue: maxAgeData?['value'],
         maximumAgeUnit: maxAgeData?['unit'] ?? AgeUnit.year,
         isMaximumAgeInfinite: v.isMaximumAgeInfinite,
-        maximumGapYears: v.selectedMaximumGapYears,
+        maximumGapYears: gapInYears,
       ));
     }
 
@@ -340,7 +366,7 @@ class _DoseEntry {
 
   final nameController = TextEditingController();
   String? selectedMinimumAge;   // e.g., "6 Months"
-  int? selectedMaximumGapYears; // e.g., 1, 2, 3 years
+  String? selectedMaximumGap;   // e.g., "2 Months", "1 Year"
 }
 
 class _VaccineEntry {
@@ -354,7 +380,7 @@ class _VaccineEntry {
   String? selectedMinimumAge;
   String? selectedMaximumAge;
   bool isMaximumAgeInfinite = false;
-  int? selectedMaximumGapYears;
+  String? selectedMaximumGap; // e.g., "2 Months", "1 Year"
 }
 
 class _VaccineFormCard extends StatefulWidget {
@@ -579,25 +605,38 @@ class _VaccineFormCardState extends State<_VaccineFormCard> {
                       ),
                 ),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<int>(
-                  value: entry.selectedMaximumGapYears,
-                  decoration: const InputDecoration(
-                    hintText: 'Select maximum gap',
-                    helperText: 'The maximum allowable gap between doses in years',
-                    helperMaxLines: 2,
-                    isDense: true,
-                  ),
-                  items: List.generate(10, (index) {
-                    final year = index + 1;
-                    return DropdownMenuItem(
-                      value: year,
-                      child: Text(year == 1 ? '1 Year' : '$year Years'),
-                    );
-                  }),
-                  onChanged: (value) {
-                    setState(() {
-                      entry.selectedMaximumGapYears = value;
+                Autocomplete<String>(
+                  optionsBuilder: (textEditingValue) {
+                    if (textEditingValue.text.isEmpty) {
+                      return Vaccine.generateAgeOptions();
+                    }
+                    return Vaccine.generateAgeOptions().where((option) {
+                      return option.toLowerCase().contains(
+                        textEditingValue.text.toLowerCase(),
+                      );
                     });
+                  },
+                  onSelected: (selection) {
+                    setState(() {
+                      entry.selectedMaximumGap = selection;
+                    });
+                  },
+                  initialValue: entry.selectedMaximumGap != null
+                      ? TextEditingValue(text: entry.selectedMaximumGap!)
+                      : null,
+                  fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+                    return TextFormField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g., 2 Months, 1 Year',
+                        helperText: 'The maximum allowable gap between doses',
+                        helperMaxLines: 2,
+                        isDense: true,
+                        suffixIcon: Icon(Icons.arrow_drop_down, size: 24),
+                      ),
+                      onFieldSubmitted: (value) => onSubmit(),
+                    );
                   },
                 ),
                 const SizedBox(height: 20),
@@ -703,30 +742,43 @@ class _VaccineFormCardState extends State<_VaccineFormCard> {
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'Gap from previous dose (years)',
+                              'Gap from previous dose',
                               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                     color: AppTheme.onSurfaceVariant,
                                     fontWeight: FontWeight.w500,
                                   ),
                             ),
                             const SizedBox(height: 6),
-                            DropdownButtonFormField<int>(
-                              value: doseEntry.selectedMaximumGapYears,
-                              decoration: const InputDecoration(
-                                hintText: 'Select gap',
-                                isDense: true,
-                              ),
-                              items: List.generate(10, (index) {
-                                final year = index + 1;
-                                return DropdownMenuItem(
-                                  value: year,
-                                  child: Text(year == 1 ? '1 Year' : '$year Years'),
-                                );
-                              }),
-                              onChanged: (value) {
-                                setState(() {
-                                  doseEntry.selectedMaximumGapYears = value;
+                            Autocomplete<String>(
+                              optionsBuilder: (textEditingValue) {
+                                if (textEditingValue.text.isEmpty) {
+                                  return Vaccine.generateAgeOptions();
+                                }
+                                return Vaccine.generateAgeOptions().where((option) {
+                                  return option.toLowerCase().contains(
+                                    textEditingValue.text.toLowerCase(),
+                                  );
                                 });
+                              },
+                              onSelected: (selection) {
+                                setState(() {
+                                  doseEntry.selectedMaximumGap = selection;
+                                });
+                              },
+                              initialValue: doseEntry.selectedMaximumGap != null
+                                  ? TextEditingValue(text: doseEntry.selectedMaximumGap!)
+                                  : null,
+                              fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+                                return TextFormField(
+                                  controller: controller,
+                                  focusNode: focusNode,
+                                  decoration: const InputDecoration(
+                                    hintText: 'e.g., 2 Months, 1 Year',
+                                    isDense: true,
+                                    suffixIcon: Icon(Icons.arrow_drop_down, size: 24),
+                                  ),
+                                  onFieldSubmitted: (value) => onSubmit(),
+                                );
                               },
                             ),
                           ],

@@ -48,6 +48,31 @@ class VaccinationRecord {
       vaccines: vaccines ?? this.vaccines,
     );
   }
+
+  /// Convert to JSON for API
+  Map<String, dynamic> toJson() {
+    return {
+      'recordId': id,
+      'date': date.toIso8601String(),
+      'childName': childName,
+      'visit': visit,
+      'vaccines': vaccines.map((v) => v.toJson()).toList(),
+    };
+  }
+
+  /// Create from JSON from API
+  factory VaccinationRecord.fromJson(Map<String, dynamic> json) {
+    return VaccinationRecord(
+      id: json['recordId'] ?? json['_id'] ?? '',
+      date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
+      childName: json['childName'] ?? '',
+      visit: json['visit'] ?? '',
+      vaccines: (json['vaccines'] as List<dynamic>?)
+              ?.map((v) => Vaccine.fromJson(v as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
 }
 
 /// One vaccine (e.g. TB, BCG, PENTVALENT) with optional brand.
@@ -115,6 +140,51 @@ class Vaccine {
       maximumAgeUnit: maximumAgeUnit ?? this.maximumAgeUnit,
       isMaximumAgeInfinite: isMaximumAgeInfinite ?? this.isMaximumAgeInfinite,
       maximumGapYears: maximumGapYears ?? this.maximumGapYears,
+    );
+  }
+
+  /// Convert to JSON for API
+  Map<String, dynamic> toJson() {
+    return {
+      'vaccineId': id,
+      'name': name,
+      if (brand != null) 'brand': brand,
+      'doses': doses.map((d) => d.toJson()).toList(),
+      if (minimumAgeValue != null) 'minimumAgeValue': minimumAgeValue,
+      'minimumAgeUnit': minimumAgeUnit.name,
+      if (maximumAgeValue != null) 'maximumAgeValue': maximumAgeValue,
+      'maximumAgeUnit': maximumAgeUnit.name,
+      'isMaximumAgeInfinite': isMaximumAgeInfinite,
+      if (maximumGapYears != null) 'maximumGapYears': maximumGapYears,
+    };
+  }
+
+  /// Create from JSON from API
+  factory Vaccine.fromJson(Map<String, dynamic> json) {
+    return Vaccine(
+      id: json['vaccineId'] ?? json['_id'] ?? '',
+      name: json['name'] ?? '',
+      brand: json['brand'],
+      doses: (json['doses'] as List<dynamic>?)
+              ?.map((d) => Dose.fromJson(d as Map<String, dynamic>))
+              .toList() ??
+          [],
+      minimumAgeValue: json['minimumAgeValue'],
+      minimumAgeUnit: json['minimumAgeUnit'] != null
+          ? AgeUnit.values.firstWhere(
+              (e) => e.name == json['minimumAgeUnit'],
+              orElse: () => AgeUnit.month,
+            )
+          : AgeUnit.month,
+      maximumAgeValue: json['maximumAgeValue'],
+      maximumAgeUnit: json['maximumAgeUnit'] != null
+          ? AgeUnit.values.firstWhere(
+              (e) => e.name == json['maximumAgeUnit'],
+              orElse: () => AgeUnit.year,
+            )
+          : AgeUnit.year,
+      isMaximumAgeInfinite: json['isMaximumAgeInfinite'] ?? false,
+      maximumGapYears: json['maximumGapYears'],
     );
   }
 
@@ -203,7 +273,8 @@ class Dose {
     this.administeredAt,
     this.minimumAgeValue,
     this.minimumAgeUnit = AgeUnit.month,
-    this.maximumGapYears,
+    this.maximumGapValue,
+    this.maximumGapUnit = AgeUnit.month,
   });
 
   final String id;
@@ -214,8 +285,9 @@ class Dose {
   final int? minimumAgeValue;
   final AgeUnit minimumAgeUnit;
 
-  /// Maximum gap from previous dose in years (for dose 2, 3, etc.)
-  final int? maximumGapYears;
+  /// Maximum gap from previous dose (e.g. 2 months, 1 year)
+  final int? maximumGapValue;
+  final AgeUnit maximumGapUnit;
 
   Dose copyWith({
     String? id,
@@ -223,7 +295,8 @@ class Dose {
     DateTime? administeredAt,
     int? minimumAgeValue,
     AgeUnit? minimumAgeUnit,
-    int? maximumGapYears,
+    int? maximumGapValue,
+    AgeUnit? maximumGapUnit,
   }) {
     return Dose(
       id: id ?? this.id,
@@ -231,7 +304,46 @@ class Dose {
       administeredAt: administeredAt ?? this.administeredAt,
       minimumAgeValue: minimumAgeValue ?? this.minimumAgeValue,
       minimumAgeUnit: minimumAgeUnit ?? this.minimumAgeUnit,
-      maximumGapYears: maximumGapYears ?? this.maximumGapYears,
+      maximumGapValue: maximumGapValue ?? this.maximumGapValue,
+      maximumGapUnit: maximumGapUnit ?? this.maximumGapUnit,
+    );
+  }
+
+  /// Convert to JSON for API
+  Map<String, dynamic> toJson() {
+    return {
+      'doseId': id,
+      'name': name,
+      if (administeredAt != null) 'administeredAt': administeredAt!.toIso8601String(),
+      if (minimumAgeValue != null) 'minimumAgeValue': minimumAgeValue,
+      'minimumAgeUnit': minimumAgeUnit.name,
+      if (maximumGapValue != null) 'maximumGapValue': maximumGapValue,
+      'maximumGapUnit': maximumGapUnit.name,
+    };
+  }
+
+  /// Create from JSON from API
+  factory Dose.fromJson(Map<String, dynamic> json) {
+    return Dose(
+      id: json['doseId'] ?? json['_id'] ?? '',
+      name: json['name'] ?? '',
+      administeredAt: json['administeredAt'] != null
+          ? DateTime.parse(json['administeredAt'])
+          : null,
+      minimumAgeValue: json['minimumAgeValue'],
+      minimumAgeUnit: json['minimumAgeUnit'] != null
+          ? AgeUnit.values.firstWhere(
+              (e) => e.name == json['minimumAgeUnit'],
+              orElse: () => AgeUnit.month,
+            )
+          : AgeUnit.month,
+      maximumGapValue: json['maximumGapValue'],
+      maximumGapUnit: json['maximumGapUnit'] != null
+          ? AgeUnit.values.firstWhere(
+              (e) => e.name == json['maximumGapUnit'],
+              orElse: () => AgeUnit.month,
+            )
+          : AgeUnit.month,
     );
   }
 }

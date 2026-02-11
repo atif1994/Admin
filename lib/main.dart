@@ -9,7 +9,7 @@ import 'routes/app_routes.dart';
 void main() {
   runApp(const MyApp());
 }
-
+///ok  used
 /// MVC + GetX: GetMaterialApp with routes and bindings.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

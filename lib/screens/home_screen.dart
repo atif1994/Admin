@@ -121,21 +121,30 @@ class _HomeScreenState extends State<HomeScreen> {
         child: const Icon(Icons.add),
       ),
       body: Obx(() {
+        if (_records.isLoading.value) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+        
         final list = _records.records;
         if (list.isEmpty) {
           return _buildEmpty();
         }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: list.length,
-          itemBuilder: (context, index) {
-            final record = list[index];
-            return _RecordCard(
-              record: record,
-              dateFormat: _dateFormat,
-              onMenuTap: () => _showOptionsBottomSheet(record),
-            );
-          },
+        return RefreshIndicator(
+          onRefresh: _records.loadRecords,
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: list.length,
+            itemBuilder: (context, index) {
+              final record = list[index];
+              return _RecordCard(
+                record: record,
+                dateFormat: _dateFormat,
+                onMenuTap: () => _showOptionsBottomSheet(record),
+              );
+            },
+          ),
         );
       }),
     );
