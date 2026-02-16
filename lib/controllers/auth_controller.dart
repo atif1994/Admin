@@ -146,6 +146,11 @@ class AuthController extends GetxController {
 
   Future<void> logout() async {
     await _apiService.clearToken();
-    Get.offAllNamed(Routes.login);
+    // Admin app no longer has login - just clear token
+    Get.snackbar(
+      'Logged Out',
+      'Token cleared',
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 }

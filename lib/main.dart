@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
       title: 'Admin',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      initialRoute: Routes.login,
+      initialRoute: Routes.home,
       initialBinding: InitialBinding(),
       getPages: AppPages.routes,
     );

@@ -5,12 +5,11 @@ import 'package:intl/intl.dart';
 import '../models/vaccination_record.dart';
 import '../theme/app_theme.dart';
 import '../controllers/records_controller.dart';
-import '../controllers/auth_controller.dart';
 import '../routes/app_routes.dart';
 import 'create_record_screen.dart';
 
 /// MVC View: list of records (date / child / visit).
-/// Uses [RecordsController] for data and [AuthController] for logout.
+/// Uses [RecordsController] for data.
 /// Tap a record to select it and show edit/delete bottom bar.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,7 +22,6 @@ class _HomeScreenState extends State<HomeScreen> {
   static final DateFormat _dateFormat = DateFormat('MMM d, y');
 
   RecordsController get _records => Get.find<RecordsController>();
-  AuthController get _auth => Get.find<AuthController>();
 
   void _showOptionsBottomSheet(VaccinationRecord record) {
     Get.bottomSheet(
@@ -107,12 +105,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vaccination Records'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _auth.logout,
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.toNamed(Routes.createRecord),

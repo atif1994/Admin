@@ -27,9 +27,14 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          flutter-version: '3.27.0'
 
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Analyze code
+        run: flutter analyze || true
+        continue-on-error: true
 
       - name: Build APK
         run: flutter build apk --release

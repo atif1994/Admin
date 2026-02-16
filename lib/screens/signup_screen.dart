@@ -158,19 +158,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Already have an account? ',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    TextButton(
-                      onPressed: () => Get.offNamed(Routes.login),
-                      child: const Text('Log in'),
-                    ),
-                  ],
-                ),
+                // Login removed - admin app no longer uses login/signup
               ],
             ),
           ),
